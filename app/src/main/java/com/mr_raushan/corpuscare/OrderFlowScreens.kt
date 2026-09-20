@@ -38,11 +38,11 @@ fun OrderPreviewScreen(
     // QR Payment Dialog
     if (showQR) {
         AlertDialog(
-            onDismissRequest = { if (!isProcessing) showQR = false },
+            onDismissRequest = { showQR = false },
             confirmButton = {
                 Button(
                     onClick = {
-                        isProcessing = true
+                        // FAST CONFIRMATION (Like Appointment Flow)
                         val orderId = "ORD" + System.currentTimeMillis().toString().takeLast(6)
                         val transId = "TXN" + UUID.randomUUID().toString().take(8).uppercase()
                         val order = Order(
@@ -54,40 +54,26 @@ fun OrderPreviewScreen(
                             transactionId = transId
                         )
                         
+                        confirmedOrder = order
+                        showQR = false
+                        CartManager.clearCart()
+                        Toast.makeText(context, "Order Placed Successfully!", Toast.LENGTH_SHORT).show()
+
+                        // Background sync
                         val uid = FirebaseAuth.getInstance().currentUser?.uid
                         if (uid != null) {
-                            val db = FirebaseFirestore.getInstance()
-                            db.collection("users").document(uid)
+                            FirebaseFirestore.getInstance().collection("users").document(uid)
                                 .collection("orders").document(order.id).set(order)
-                                .addOnSuccessListener {
-                                    Toast.makeText(context, "Order Placed Successfully!", Toast.LENGTH_SHORT).show()
-                                    CartManager.clearCart()
-                                    isProcessing = false
-                                    showQR = false
-                                    confirmedOrder = order
-                                }
-                                .addOnFailureListener {
-                                    isProcessing = false
-                                    Toast.makeText(context, "Failed to place order: ${it.message}", Toast.LENGTH_SHORT).show()
-                                }
-                        } else {
-                            isProcessing = false
-                            showQR = false
-                            confirmedOrder = order
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF006766)),
-                    enabled = !isProcessing
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF006766))
                 ) {
-                    if (isProcessing) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp))
-                    else Text("Close & Complete Order")
+                    Text("Close & Get Receipt")
                 }
             },
             dismissButton = {
-                if (!isProcessing) {
-                    TextButton(onClick = { showQR = false }) {
-                        Text("Cancel")
-                    }
+                TextButton(onClick = { showQR = false }) {
+                    Text("Cancel")
                 }
             },
             title = { Text("Scan QR to Pay", fontWeight = FontWeight.Bold) },

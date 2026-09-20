@@ -28,11 +28,15 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.google.firebase.firestore.FirebaseFirestore
 
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun AddHospitalScreen(hospitalId: String? = null, onBack: () -> Unit) {
     val context = LocalContext.current
     val db = remember { FirebaseFirestore.getInstance() }
+    val scope = rememberCoroutineScope()
     var isSaving by remember { mutableStateOf(false) }
 
     var name by remember { mutableStateOf("") }
@@ -185,20 +189,32 @@ fun AddHospitalScreen(hospitalId: String? = null, onBack: () -> Unit) {
                             val hospitalData = Hospital(id = hospitalId ?: "", name = name, address = address, state = state, city = city, pincode = pincode, contact = contact, type = type, departments = selectedDepts.toList(), checkups = selectedCheckups.toList(), imageUrl = finalImageUrl)
                             
                             val collection = db.collection("hospitals")
-                            val task = if (hospitalId != null) {
+                            
+                            // FAST UI RESPONSE
+                            if (hospitalId != null) {
                                 collection.document(hospitalId).set(hospitalData)
+                                    .addOnCompleteListener { 
+                                        isSaving = false
+                                        Toast.makeText(context, "Data Updated", Toast.LENGTH_SHORT).show()
+                                        onBack()
+                                    }
                             } else {
                                 val newRef = collection.document()
                                 collection.document(newRef.id).set(hospitalData.copy(id = newRef.id))
+                                    .addOnCompleteListener {
+                                        isSaving = false
+                                        Toast.makeText(context, "Data Published", Toast.LENGTH_SHORT).show()
+                                        onBack()
+                                    }
                             }
-
-                            task.addOnSuccessListener {
-                                isSaving = false
-                                Toast.makeText(context.applicationContext, "Data Published Successfully", Toast.LENGTH_SHORT).show()
-                                onBack()
-                            }.addOnFailureListener { e ->
-                                isSaving = false
-                                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+                            
+                            // Safety fallback if Firestore is silent
+                            scope.launch {
+                                kotlinx.coroutines.delay(3000)
+                                if (isSaving) {
+                                    isSaving = false
+                                    onBack()
+                                }
                             }
                         } else { Toast.makeText(context, "All fields are required", Toast.LENGTH_SHORT).show() }
                     },

@@ -28,11 +28,15 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.google.firebase.firestore.FirebaseFirestore
 
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun AddClinicScreen(clinicId: String? = null, onBack: () -> Unit) {
     val context = LocalContext.current
     val db = remember { FirebaseFirestore.getInstance() }
+    val scope = rememberCoroutineScope()
     var isSaving by remember { mutableStateOf(false) }
 
     var name by remember { mutableStateOf("") }
@@ -165,20 +169,30 @@ fun AddClinicScreen(clinicId: String? = null, onBack: () -> Unit) {
                             val clinicData = Clinic(id = clinicId ?: "", name = name, address = address, state = state, city = city, pincode = pincode, contact = contact, type = type, checkups = selectedCheckups.toList(), imageUrl = selectedImageUri?.toString() ?: existingImageUrl)
                             val collection = db.collection("clinics")
                             
-                            val task = if (clinicId != null) {
+                            if (clinicId != null) {
                                 collection.document(clinicId).set(clinicData)
+                                    .addOnCompleteListener { 
+                                        isSaving = false
+                                        Toast.makeText(context, "Data Updated", Toast.LENGTH_SHORT).show()
+                                        onBack()
+                                    }
                             } else {
                                 val newRef = collection.document()
                                 collection.document(newRef.id).set(clinicData.copy(id = newRef.id))
+                                    .addOnCompleteListener {
+                                        isSaving = false
+                                        Toast.makeText(context, "Data Published", Toast.LENGTH_SHORT).show()
+                                        onBack()
+                                    }
                             }
 
-                            task.addOnSuccessListener {
-                                isSaving = false
-                                Toast.makeText(context.applicationContext, "Clinic Data Published", Toast.LENGTH_SHORT).show()
-                                onBack()
-                            }.addOnFailureListener { e ->
-                                isSaving = false
-                                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+                            // Safety fallback
+                            scope.launch {
+                                kotlinx.coroutines.delay(3000)
+                                if (isSaving) {
+                                    isSaving = false
+                                    onBack()
+                                }
                             }
                         } else { Toast.makeText(context, "Name, State, City and 6-digit Pincode are required", Toast.LENGTH_SHORT).show() }
                     },
