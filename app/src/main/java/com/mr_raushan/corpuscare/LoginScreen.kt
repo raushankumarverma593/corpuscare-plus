@@ -340,26 +340,35 @@ fun LoginScreen(onLoginSuccess: (String, String, String?) -> Unit) {
                             pass = facilityPass,
                             onPassChange = { facilityPass = it },
                             onLogin = {
-                                if (facilityId.isNotBlank() && facilityPass.isNotBlank()) {
+                                val fId = facilityId.trim()
+                                val fPass = facilityPass.trim()
+                                
+                                if (fId.isNotBlank() && fPass.isNotBlank()) {
                                     val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
                                     // Check hospitals first
-                                    db.collection("hospitals").document(facilityId).get()
+                                    db.collection("hospitals").document(fId).get()
                                         .addOnSuccessListener { doc ->
-                                            if (doc.exists() && doc.getString("contact") == facilityPass) {
+                                            if (doc.exists() && doc.getString("contact") == fPass) {
                                                 Toast.makeText(context, "Hospital Authorized", Toast.LENGTH_SHORT).show()
-                                                onLoginSuccess(doc.getString("name") ?: "Hospital", "Facility", facilityId)
+                                                onLoginSuccess(doc.getString("name") ?: "Hospital", "Facility", fId)
                                             } else {
                                                 // Check clinics
-                                                db.collection("clinics").document(facilityId).get()
+                                                db.collection("clinics").document(fId).get()
                                                     .addOnSuccessListener { cDoc ->
-                                                        if (cDoc.exists() && cDoc.getString("contact") == facilityPass) {
+                                                        if (cDoc.exists() && cDoc.getString("contact") == fPass) {
                                                             Toast.makeText(context, "Clinic Authorized", Toast.LENGTH_SHORT).show()
-                                                            onLoginSuccess(cDoc.getString("name") ?: "Clinic", "Facility", facilityId)
+                                                            onLoginSuccess(cDoc.getString("name") ?: "Clinic", "Facility", fId)
                                                         } else {
                                                             Toast.makeText(context, "Invalid Facility ID or Passcode", Toast.LENGTH_SHORT).show()
                                                         }
                                                     }
+                                                    .addOnFailureListener {
+                                                        Toast.makeText(context, "Auth Error: ${it.message}", Toast.LENGTH_SHORT).show()
+                                                    }
                                             }
+                                        }
+                                        .addOnFailureListener {
+                                            Toast.makeText(context, "Auth Error: ${it.message}", Toast.LENGTH_SHORT).show()
                                         }
                                 } else {
                                     Toast.makeText(context, "Please enter ID and Passcode", Toast.LENGTH_SHORT).show()

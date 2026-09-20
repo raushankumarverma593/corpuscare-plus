@@ -30,6 +30,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.tasks.await
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -113,7 +114,7 @@ fun AddHospitalScreen(hospitalId: String? = null, onBack: () -> Unit) {
                 HospitalTextField(value = pincode, onValueChange = { if (it.length <= 6) pincode = it }, label = "Pincode (6 digits)", icon = Icons.Default.PinDrop, enabled = !isSaving)
 
                 val states = listOf("Bihar", "Delhi", "Maharashtra", "Karnataka", "Uttar Pradesh", "West Bengal")
-                val citiesMap = mapOf("Bihar" to listOf("Siwan", "Chainpur", "Siswan", "Patna", "Gaya", "Muzaffarpur"), "Delhi" to listOf("New Delhi", "Dwarka", "Rohini"), "Maharashtra" to listOf("Mumbai", "Pune", "Nagpur"), "Karnataka" to listOf("Bangalore", "Mysore", "Hubli"), "Uttar Pradesh" to listOf("Lucknow", "Kanpur", "Varanasi"), "West Bengal" to listOf("Kolkata", "Siliguri", "Durgapur"))
+                val citiesMap = mapOf("Bihar" to listOf("Siwan", "Chainpur", "Siswan", "Patna", "Gaya", "Banka", "Muzaffarpur"), "Delhi" to listOf("New Delhi", "Dwarka", "Rohini"), "Maharashtra" to listOf("Mumbai", "Pune", "Nagpur"), "Karnataka" to listOf("Bangalore", "Mysore", "Hubli"), "Uttar Pradesh" to listOf("Lucknow", "Kanpur", "Varanasi"), "West Bengal" to listOf("Kolkata", "Siliguri", "Durgapur"))
                 var stateExpanded by remember { mutableStateOf(false) }
                 var cityExpanded by remember { mutableStateOf(false) }
 
@@ -185,35 +186,46 @@ fun AddHospitalScreen(hospitalId: String? = null, onBack: () -> Unit) {
                     onClick = {
                         if (name.isNotBlank() && state.isNotBlank() && city.isNotBlank() && pincode.length == 6) {
                             isSaving = true
-                            val finalImageUrl = selectedImageUri?.toString() ?: existingImageUrl
-                            val hospitalData = Hospital(id = hospitalId ?: "", name = name, address = address, state = state, city = city, pincode = pincode, contact = contact, type = type, departments = selectedDepts.toList(), checkups = selectedCheckups.toList(), imageUrl = finalImageUrl)
                             
-                            val collection = db.collection("hospitals")
-                            
-                            // FAST UI RESPONSE
-                            if (hospitalId != null) {
-                                collection.document(hospitalId).set(hospitalData)
-                                    .addOnCompleteListener { 
-                                        isSaving = false
-                                        Toast.makeText(context, "Data Updated", Toast.LENGTH_SHORT).show()
-                                        onBack()
-                                    }
-                            } else {
-                                val newRef = collection.document()
-                                collection.document(newRef.id).set(hospitalData.copy(id = newRef.id))
-                                    .addOnCompleteListener {
-                                        isSaving = false
-                                        Toast.makeText(context, "Data Published", Toast.LENGTH_SHORT).show()
-                                        onBack()
-                                    }
-                            }
-                            
-                            // Safety fallback if Firestore is silent
                             scope.launch {
-                                kotlinx.coroutines.delay(3000)
-                                if (isSaving) {
+                                // 1. UPLOAD IMAGE IF SELECTED
+                                val uploadedImageUrl = if (selectedImageUri != null) {
+                                    FirebaseUtils.uploadImage(selectedImageUri!!, "hospitals")
+                                } else {
+                                    existingImageUrl
+                                }
+
+                                // 2. PREPARE DATA
+                                val hospitalData = Hospital(
+                                    id = hospitalId ?: "",
+                                    name = name,
+                                    address = address,
+                                    state = state,
+                                    city = city,
+                                    pincode = pincode,
+                                    contact = contact,
+                                    type = type,
+                                    departments = selectedDepts.toList(),
+                                    checkups = selectedCheckups.toList(),
+                                    imageUrl = uploadedImageUrl
+                                )
+                                
+                                val collection = db.collection("hospitals")
+                                
+                                try {
+                                    if (hospitalId != null) {
+                                        collection.document(hospitalId).set(hospitalData).await()
+                                    } else {
+                                        val newRef = collection.document()
+                                        collection.document(newRef.id).set(hospitalData.copy(id = newRef.id)).await()
+                                    }
+                                    
                                     isSaving = false
+                                    Toast.makeText(context.applicationContext, "Hospital Data Published", Toast.LENGTH_SHORT).show()
                                     onBack()
+                                } catch (e: Exception) {
+                                    isSaving = false
+                                    Toast.makeText(context, "Firestore Error: ${e.message}", Toast.LENGTH_LONG).show()
                                 }
                             }
                         } else { Toast.makeText(context, "All fields are required", Toast.LENGTH_SHORT).show() }

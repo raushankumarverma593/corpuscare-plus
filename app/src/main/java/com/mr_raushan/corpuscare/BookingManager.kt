@@ -30,7 +30,7 @@ object BookingManager {
     val localDoctors = listOf(
         Doctor(
             id = "local_doc_1",
-            name = "Dr. Raushan Kumar",
+            name = "Dr. Thakur Bijendra Kr. Prasad (BAMS)",
             hospitalName = "City Care Life Hospital",
             experience = "8 Yrs Experience",
             department = "Cardiology",

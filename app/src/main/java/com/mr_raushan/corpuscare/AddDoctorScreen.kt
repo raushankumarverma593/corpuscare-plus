@@ -28,12 +28,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddDoctorScreen(doctorId: String? = null, onBack: () -> Unit) {
     val context = LocalContext.current
     val db = remember { FirebaseFirestore.getInstance() }
+    val scope = rememberCoroutineScope()
     var isSaving by remember { mutableStateOf(false) }
 
     var name by remember { mutableStateOf("") }
@@ -169,7 +172,7 @@ fun AddDoctorScreen(doctorId: String? = null, onBack: () -> Unit) {
 
                 // Location (State/City)
                 val states = listOf("Bihar", "Delhi", "Maharashtra", "Karnataka", "Uttar Pradesh", "West Bengal")
-                val citiesMap = mapOf("Bihar" to listOf("Siwan", "Chainpur", "Siswan", "Patna", "Gaya", "Muzaffarpur"), "Delhi" to listOf("New Delhi", "Dwarka", "Rohini"), "Maharashtra" to listOf("Mumbai", "Pune", "Nagpur"), "Karnataka" to listOf("Bangalore", "Mysore", "Hubli"), "Uttar Pradesh" to listOf("Lucknow", "Kanpur", "Varanasi"), "West Bengal" to listOf("Kolkata", "Siliguri", "Durgapur"))
+                val citiesMap = mapOf("Bihar" to listOf("Siwan", "Chainpur", "Siswan", "Patna", "Gaya", "Banka", "Muzaffarpur"), "Delhi" to listOf("New Delhi", "Dwarka", "Rohini"), "Maharashtra" to listOf("Mumbai", "Pune", "Nagpur"), "Karnataka" to listOf("Bangalore", "Mysore", "Hubli"), "Uttar Pradesh" to listOf("Lucknow", "Kanpur", "Varanasi"), "West Bengal" to listOf("Kolkata", "Siliguri", "Durgapur"))
                 var stateExpanded by remember { mutableStateOf(false) }
                 var cityExpanded by remember { mutableStateOf(false) }
 
@@ -194,34 +197,46 @@ fun AddDoctorScreen(doctorId: String? = null, onBack: () -> Unit) {
                     onClick = {
                         if (name.isNotBlank() && department.isNotBlank() && selectedFacilityId.isNotBlank()) {
                             isSaving = true
-                            val doctorData = Doctor(
-                                id = doctorId ?: "",
-                                name = name,
-                                hospitalName = hospitalName,
-                                facilityId = selectedFacilityId,
-                                experience = experience,
-                                department = department,
-                                city = city,
-                                state = state,
-                                pincode = pincode,
-                                imageUrl = selectedImageUri?.toString() ?: existingImageUrl
-                            )
-                            val collection = db.collection("doctors")
                             
-                            val task = if (doctorId != null) {
-                                collection.document(doctorId).set(doctorData)
-                            } else {
-                                val newRef = collection.document()
-                                collection.document(newRef.id).set(doctorData.copy(id = newRef.id))
-                            }
+                            scope.launch {
+                                // 1. UPLOAD IMAGE
+                                val uploadedImageUrl = if (selectedImageUri != null) {
+                                    FirebaseUtils.uploadImage(selectedImageUri!!, "doctors")
+                                } else {
+                                    existingImageUrl
+                                }
 
-                            task.addOnSuccessListener {
-                                isSaving = false
-                                Toast.makeText(context.applicationContext, "Doctor Saved Successfully", Toast.LENGTH_SHORT).show()
-                                onBack()
-                            }.addOnFailureListener { e ->
-                                isSaving = false
-                                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+                                // 2. PREPARE DATA
+                                val doctorData = Doctor(
+                                    id = doctorId ?: "",
+                                    name = name,
+                                    hospitalName = hospitalName,
+                                    facilityId = selectedFacilityId,
+                                    experience = experience,
+                                    department = department,
+                                    city = city,
+                                    state = state,
+                                    pincode = pincode,
+                                    imageUrl = uploadedImageUrl
+                                )
+                                
+                                val collection = db.collection("doctors")
+                                
+                                try {
+                                    if (doctorId != null) {
+                                        collection.document(doctorId).set(doctorData).await()
+                                    } else {
+                                        val newRef = collection.document()
+                                        collection.document(newRef.id).set(doctorData.copy(id = newRef.id)).await()
+                                    }
+                                    
+                                    isSaving = false
+                                    Toast.makeText(context.applicationContext, "Doctor Profile Published", Toast.LENGTH_SHORT).show()
+                                    onBack()
+                                } catch (e: Exception) {
+                                    isSaving = false
+                                    Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+                                }
                             }
                         } else { Toast.makeText(context, "Name, Specialty, and Facility are required", Toast.LENGTH_SHORT).show() }
                     },

@@ -30,6 +30,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.tasks.await
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -104,7 +105,7 @@ fun AddClinicScreen(clinicId: String? = null, onBack: () -> Unit) {
                 HospitalTextField(value = pincode, onValueChange = { if (it.length <= 6) pincode = it }, label = "Pincode (6 digits)", icon = Icons.Default.PinDrop, enabled = !isSaving)
 
                 val states = listOf("Bihar", "Delhi", "Maharashtra", "Karnataka", "Uttar Pradesh", "West Bengal")
-                val citiesMap = mapOf("Bihar" to listOf("Siwan", "Chainpur", "Siswan", "Patna", "Gaya", "Muzaffarpur"), "Delhi" to listOf("New Delhi", "Dwarka", "Rohini"), "Maharashtra" to listOf("Mumbai", "Pune", "Nagpur"), "Karnataka" to listOf("Bangalore", "Mysore", "Hubli"), "Uttar Pradesh" to listOf("Lucknow", "Kanpur", "Varanasi"), "West Bengal" to listOf("Kolkata", "Siliguri", "Durgapur"))
+                val citiesMap = mapOf("Bihar" to listOf("Siwan", "Chainpur", "Siswan", "Patna", "Gaya", "Banka", "Muzaffarpur"), "Delhi" to listOf("New Delhi", "Dwarka", "Rohini"), "Maharashtra" to listOf("Mumbai", "Pune", "Nagpur"), "Karnataka" to listOf("Bangalore", "Mysore", "Hubli"), "Uttar Pradesh" to listOf("Lucknow", "Kanpur", "Varanasi"), "West Bengal" to listOf("Kolkata", "Siliguri", "Durgapur"))
                 var stateExpanded by remember { mutableStateOf(false) }
                 var cityExpanded by remember { mutableStateOf(false) }
 
@@ -166,32 +167,45 @@ fun AddClinicScreen(clinicId: String? = null, onBack: () -> Unit) {
                     onClick = {
                         if (name.isNotBlank() && state.isNotBlank() && city.isNotBlank() && pincode.length == 6) {
                             isSaving = true
-                            val clinicData = Clinic(id = clinicId ?: "", name = name, address = address, state = state, city = city, pincode = pincode, contact = contact, type = type, checkups = selectedCheckups.toList(), imageUrl = selectedImageUri?.toString() ?: existingImageUrl)
-                            val collection = db.collection("clinics")
                             
-                            if (clinicId != null) {
-                                collection.document(clinicId).set(clinicData)
-                                    .addOnCompleteListener { 
-                                        isSaving = false
-                                        Toast.makeText(context, "Data Updated", Toast.LENGTH_SHORT).show()
-                                        onBack()
-                                    }
-                            } else {
-                                val newRef = collection.document()
-                                collection.document(newRef.id).set(clinicData.copy(id = newRef.id))
-                                    .addOnCompleteListener {
-                                        isSaving = false
-                                        Toast.makeText(context, "Data Published", Toast.LENGTH_SHORT).show()
-                                        onBack()
-                                    }
-                            }
-
-                            // Safety fallback
                             scope.launch {
-                                kotlinx.coroutines.delay(3000)
-                                if (isSaving) {
+                                // 1. UPLOAD IMAGE
+                                val uploadedImageUrl = if (selectedImageUri != null) {
+                                    FirebaseUtils.uploadImage(selectedImageUri!!, "clinics")
+                                } else {
+                                    existingImageUrl
+                                }
+
+                                // 2. PREPARE DATA
+                                val clinicData = Clinic(
+                                    id = clinicId ?: "",
+                                    name = name,
+                                    address = address,
+                                    state = state,
+                                    city = city,
+                                    pincode = pincode,
+                                    contact = contact,
+                                    type = type,
+                                    checkups = selectedCheckups.toList(),
+                                    imageUrl = uploadedImageUrl
+                                )
+                                
+                                val collection = db.collection("clinics")
+                                
+                                try {
+                                    if (clinicId != null) {
+                                        collection.document(clinicId).set(clinicData).await()
+                                    } else {
+                                        val newRef = collection.document()
+                                        collection.document(newRef.id).set(clinicData.copy(id = newRef.id)).await()
+                                    }
+                                    
                                     isSaving = false
+                                    Toast.makeText(context.applicationContext, "Clinic Data Published", Toast.LENGTH_SHORT).show()
                                     onBack()
+                                } catch (e: Exception) {
+                                    isSaving = false
+                                    Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
                                 }
                             }
                         } else { Toast.makeText(context, "Name, State, City and 6-digit Pincode are required", Toast.LENGTH_SHORT).show() }
