@@ -36,8 +36,8 @@ fun FacilityDashboardScreen(
     val tabs = listOf("Appointments", "Manage Reports")
 
     var appointments by remember { mutableStateOf(listOf<Appointment>()) }
-    var reports by remember { mutableStateOf(listOf<MedicalReport>()) }
     var isLoading by remember { mutableStateOf(true) }
+    var showLogoutDialog by remember { mutableStateOf(false) }
 
     // Fetch Appointments for this facility
     LaunchedEffect(facilityId) {
@@ -51,27 +51,67 @@ fun FacilityDashboardScreen(
             }
     }
 
+    if (showLogoutDialog) {
+        AlertDialog(
+            onDismissRequest = { showLogoutDialog = false },
+            title = { Text("Confirm Logout") },
+            text = { Text("Are you sure you want to logout from the facility portal?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showLogoutDialog = false
+                        onLogout()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
+                ) {
+                    Text("Logout")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutDialog = false }) {
+                    Text("Cancel")
+                }
+            },
+            containerColor = Color.White,
+            shape = RoundedCornerShape(24.dp)
+        )
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFFF7F8FA))
     ) {
-        // Header
+        // Updated Header matching Admin style
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(color = Color(0xFF006766))
                 .statusBarsPadding()
-                .padding(16.dp)
+                .height(70.dp)
+                .padding(horizontal = 8.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(text = facilityName, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                    Text(text = "Facility Portal • ID: $facilityId", color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
-                }
-                IconButton(onClick = onLogout) {
-                    Icon(Icons.AutoMirrored.Filled.Logout, null, tint = Color.White)
-                }
+            IconButton(onClick = { showLogoutDialog = true }, modifier = Modifier.align(Alignment.CenterStart)) {
+                Icon(Icons.AutoMirrored.Filled.Logout, "Logout", tint = Color.White)
+            }
+            Text(
+                text = "Facility Dashboard",
+                color = Color.White,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.align(Alignment.Center)
+            )
+        }
+
+        // Sub-Header info
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = Color.White,
+            shadowElevation = 2.dp
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(text = facilityName, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF1A1C1E))
+                Text(text = "ID: $facilityId", fontSize = 12.sp, color = Color.Gray)
             }
         }
 

@@ -183,29 +183,22 @@ fun AddHospitalScreen(hospitalId: String? = null, onBack: () -> Unit) {
                             isSaving = true
                             val finalImageUrl = selectedImageUri?.toString() ?: existingImageUrl
                             val hospitalData = Hospital(id = hospitalId ?: "", name = name, address = address, state = state, city = city, pincode = pincode, contact = contact, type = type, departments = selectedDepts.toList(), checkups = selectedCheckups.toList(), imageUrl = finalImageUrl)
-                            if (hospitalId != null) {
-                                db.collection("hospitals").document(hospitalId).set(hospitalData)
-                                    .addOnSuccessListener {
-                                        isSaving = false
-                                        Toast.makeText(context.applicationContext, "Hospital Updated Successfully", Toast.LENGTH_SHORT).show()
-                                        onBack()
-                                    }
-                                    .addOnFailureListener { e ->
-                                        isSaving = false
-                                        Toast.makeText(context, "Update failed: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
-                                    }
+                            
+                            val collection = db.collection("hospitals")
+                            val task = if (hospitalId != null) {
+                                collection.document(hospitalId).set(hospitalData)
                             } else {
-                                val newRef = db.collection("hospitals").document()
-                                db.collection("hospitals").document(newRef.id).set(hospitalData.copy(id = newRef.id))
-                                    .addOnSuccessListener {
-                                        isSaving = false
-                                        Toast.makeText(context.applicationContext, "Hospital Added Successfully", Toast.LENGTH_SHORT).show()
-                                        onBack()
-                                    }
-                                    .addOnFailureListener { e ->
-                                        isSaving = false
-                                        Toast.makeText(context, "Save failed: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
-                                    }
+                                val newRef = collection.document()
+                                collection.document(newRef.id).set(hospitalData.copy(id = newRef.id))
+                            }
+
+                            task.addOnSuccessListener {
+                                isSaving = false
+                                Toast.makeText(context.applicationContext, "Data Published Successfully", Toast.LENGTH_SHORT).show()
+                                onBack()
+                            }.addOnFailureListener { e ->
+                                isSaving = false
+                                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
                             }
                         } else { Toast.makeText(context, "All fields are required", Toast.LENGTH_SHORT).show() }
                     },

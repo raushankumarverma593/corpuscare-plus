@@ -80,7 +80,7 @@ fun OrderPreviewScreen(
                     enabled = !isProcessing
                 ) {
                     if (isProcessing) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp))
-                    else Text("I have paid")
+                    else Text("Close & Complete Order")
                 }
             },
             dismissButton = {

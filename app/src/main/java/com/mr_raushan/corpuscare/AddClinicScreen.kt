@@ -164,29 +164,21 @@ fun AddClinicScreen(clinicId: String? = null, onBack: () -> Unit) {
                             isSaving = true
                             val clinicData = Clinic(id = clinicId ?: "", name = name, address = address, state = state, city = city, pincode = pincode, contact = contact, type = type, checkups = selectedCheckups.toList(), imageUrl = selectedImageUri?.toString() ?: existingImageUrl)
                             val collection = db.collection("clinics")
-                            if (clinicId != null) {
+                            
+                            val task = if (clinicId != null) {
                                 collection.document(clinicId).set(clinicData)
-                                    .addOnSuccessListener {
-                                        isSaving = false
-                                        Toast.makeText(context.applicationContext, "Clinic Updated Successfully", Toast.LENGTH_SHORT).show()
-                                        onBack()
-                                    }
-                                    .addOnFailureListener { e ->
-                                        isSaving = false
-                                        Toast.makeText(context, "Update failed: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
-                                    }
                             } else {
                                 val newRef = collection.document()
                                 collection.document(newRef.id).set(clinicData.copy(id = newRef.id))
-                                    .addOnSuccessListener {
-                                        isSaving = false
-                                        Toast.makeText(context.applicationContext, "Clinic Added Successfully", Toast.LENGTH_SHORT).show()
-                                        onBack()
-                                    }
-                                    .addOnFailureListener { e ->
-                                        isSaving = false
-                                        Toast.makeText(context, "Save failed: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
-                                    }
+                            }
+
+                            task.addOnSuccessListener {
+                                isSaving = false
+                                Toast.makeText(context.applicationContext, "Clinic Data Published", Toast.LENGTH_SHORT).show()
+                                onBack()
+                            }.addOnFailureListener { e ->
+                                isSaving = false
+                                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
                             }
                         } else { Toast.makeText(context, "Name, State, City and 6-digit Pincode are required", Toast.LENGTH_SHORT).show() }
                     },

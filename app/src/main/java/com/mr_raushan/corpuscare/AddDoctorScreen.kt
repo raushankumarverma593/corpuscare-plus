@@ -208,35 +208,22 @@ fun AddDoctorScreen(doctorId: String? = null, onBack: () -> Unit) {
                             )
                             val collection = db.collection("doctors")
                             
-                            if (doctorId != null) {
+                            val task = if (doctorId != null) {
                                 collection.document(doctorId).set(doctorData)
-                                    .addOnCompleteListener { task ->
-                                        isSaving = false
-                                        if (task.isSuccessful) {
-                                            Toast.makeText(context.applicationContext, "Doctor Info Updated Successfully", Toast.LENGTH_SHORT).show()
-                                            onBack()
-                                        } else {
-                                            val errorMsg = task.exception?.localizedMessage ?: "Network Error"
-                                            Toast.makeText(context, "Update failed: $errorMsg", Toast.LENGTH_LONG).show()
-                                            if (errorMsg.contains("network", ignoreCase = true)) onBack()
-                                        }
-                                    }
                             } else {
                                 val newRef = collection.document()
                                 collection.document(newRef.id).set(doctorData.copy(id = newRef.id))
-                                    .addOnCompleteListener { task ->
-                                        isSaving = false
-                                        if (task.isSuccessful) {
-                                            Toast.makeText(context.applicationContext, "Doctor Added Successfully", Toast.LENGTH_SHORT).show()
-                                            onBack()
-                                        } else {
-                                            val errorMsg = task.exception?.localizedMessage ?: "Network Error"
-                                            Toast.makeText(context, "Save failed: $errorMsg", Toast.LENGTH_LONG).show()
-                                            if (errorMsg.contains("network", ignoreCase = true)) onBack()
-                                        }
-                                    }
                             }
-                        } else { Toast.makeText(context, "Name, Specialty, City and 6-digit Pincode are required", Toast.LENGTH_SHORT).show() }
+
+                            task.addOnSuccessListener {
+                                isSaving = false
+                                Toast.makeText(context.applicationContext, "Doctor Saved Successfully", Toast.LENGTH_SHORT).show()
+                                onBack()
+                            }.addOnFailureListener { e ->
+                                isSaving = false
+                                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+                            }
+                        } else { Toast.makeText(context, "Name, Specialty, and Facility are required", Toast.LENGTH_SHORT).show() }
                     },
                     enabled = !isSaving,
                     modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(16.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF006766))
